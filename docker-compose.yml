@@ -1,0 +1,51 @@
+﻿version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: planner
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    profiles: ["core"]
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    profiles: ["core"]
+
+  auth_svc:
+    build: ./services/auth-java
+    depends_on: [postgres]
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/planner
+      DB_USER: app
+      DB_PASSWORD: app
+    ports:
+      - "8080:8080"
+    profiles: ["core","all"]
+
+  tasks_svc:
+    build: ./services/tasks-python
+    depends_on: [postgres, redis]
+    environment:
+      DATABASE_URL: postgresql://app:app@postgres:5432/planner
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    profiles: ["core","all"]
+
+  metrics_svc:
+    build: ./services/metrics-rust
+    depends_on: [auth_svc, tasks_svc]
+    ports:
+      - "9000:9000"
+    profiles: ["all"]
+
+volumes:
+  pgdata:
